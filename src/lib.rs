@@ -164,7 +164,7 @@ pub fn run<T: EventContents, U: ObjectType>(
   let mut new_objects = Vec::new();
   let mut remove_object_id = Vec::new();
   for f in generate_functions.iter() {
-    let generated_data = f(&ctx);
+    let generated_data = f(ctx);
     let e_lst = generated_data.events;
     for e in e_lst.iter() {
       let event = Event {
@@ -216,5 +216,5 @@ pub fn run<T: EventContents, U: ObjectType>(
 fn generate_object_id(object_name: &str, point: &Point, generate_time: &BigUint) -> String {
   let now = SystemTime::now();
   let str = format!("{object_name}{point:?}{generate_time:?}{now:?}");
-  base64::encode(&str.as_bytes())
+  base64::encode(str.as_bytes())
 }
