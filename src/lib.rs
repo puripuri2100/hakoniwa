@@ -107,6 +107,32 @@ impl Time {
       ..self.clone()
     }
   }
+
+  /// 時間の足し算をする
+  /// 年・日の換算単位がずれていた場合はselfの方に合わせる
+  pub fn add(&self, other: &Time) -> Time {
+    let all = &self.all + &other.all;
+    Time::new(
+      all,
+      self.clone().one_day_of_time,
+      self.clone().one_year_of_day,
+    )
+  }
+
+  /// 時間の足し算をする
+  /// 年・日の換算単位がずれていた場合はselfの方に合わせる
+  /// 引く方が大きい場合は`None`が帰る
+  pub fn minus(&self, other: &Time) -> Option<Time> {
+    if self.all < other.all {
+      return None;
+    }
+    let all = &self.all - &other.all;
+    Some(Time::new(
+      all,
+      self.clone().one_day_of_time,
+      self.clone().one_year_of_day,
+    ))
+  }
 }
 
 /// 地図上での「地点」を表す。
