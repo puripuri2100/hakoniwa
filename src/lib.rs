@@ -1,11 +1,11 @@
 use num_bigint::BigUint;
 use num_traits::identities::One;
-use std::time::SystemTime;
 use rustc_hash::FxHashMap;
+use std::time::SystemTime;
 
 /// 現在の時間に関するデータ
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Now {
+pub struct Time {
   /// 単位時間がどれくらいたったのかを計算する
   all: BigUint,
   /// 一日にかかる単位時間
@@ -22,13 +22,13 @@ pub struct Now {
   remainder_day: BigUint,
 }
 
-impl Now {
+impl Time {
   pub fn new(all: BigUint, one_day_of_time: BigUint, one_year_of_day: BigUint) -> Self {
     let day = &all / &one_day_of_time;
     let remainder_time = &all % &one_day_of_time;
     let year = &day / &one_year_of_day;
     let remainder_day = &all % &one_year_of_day;
-    Now {
+    Time {
       all,
       one_day_of_time,
       day,
@@ -48,7 +48,7 @@ impl Now {
     let new_remainder_day = &self.remainder_day + &plus_day;
     let year = &self.year + (&new_remainder_day / &self.one_year_of_day);
     let remainder_day = &new_remainder_day % &self.one_year_of_day;
-    *self = Now {
+    *self = Time {
       all,
       day,
       remainder_time,
@@ -69,7 +69,7 @@ impl Now {
     let new_remainder_day = &self.remainder_day + &plus_day;
     let year = &self.year + (&new_remainder_day / &one_year_of_day);
     let remainder_day = new_remainder_day % &one_year_of_day;
-    *self = Now {
+    *self = Time {
       one_day_of_time,
       day,
       remainder_time,
@@ -89,117 +89,132 @@ pub struct Point {
   y: BigUint,
 }
 
-pub trait ObjectType {
+pub trait ObjectType: Clone {
   fn name(&self) -> String;
-  fn lifetime(&self) -> BigUint;
+  fn generated_point(&self) -> Point;
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Object<T: ObjectType + ?Sized> {
   /// 生成時刻
-  generate_time : Now,
-  /// 現在の位置
-  point: Point,
-  /// オブジェクトの種類
-  /// ユーザーが定義する
-  object_type: Box<T>,
-  /// オブジェクトの寿命
-  lifetime: BigUint
+  pub generated_time: Time,
+  /// 現在地
+  pub point: Point,
+  pub object_type: T,
 }
 
-impl<O: ToString + Clone + ObjectType + ?Sized> Object<O> {
-  pub fn get_object_type(&self) -> O {
-    *self.object_type.clone()
-  }
-  pub fn get_point(&self) -> Point {
-    self.point.clone()
-  }
-}
-
-/// イベントの
-pub trait EventContents<OT: ObjectType + ?Sized> {
-
-  fn name(&self) -> String;
-  /// イベントの発生により生成されるオブジェクトがある場合はそのオブジェクトを返す
-  fn generate_object_opt(&self) -> Option<Object<OT>>;
+pub trait EventContents: Clone {
+  // /// イベントの発生により生成されるオブジェクトがある場合はそのオブジェクトを返す
+  fn generate_object_opt(&self) -> Option<String>;
   /// イベントの発生により削除されるオブジェクトがある場合はそのID
   fn remove_object_opt(&self) -> Option<String>;
   /// オブジェクトを移動させる場合に発生する
   /// 対象のオブジェクトのIDと移動先の地点
   fn move_object_opt(&self) -> Option<(String, Point)>;
+  /// eventの寿命
+  /// Noneの場合は永久
+  fn lifetime(&self) -> Option<Time>;
 }
 
 #[derive(Debug, Clone)]
-pub struct Event<C: EventContents<dyn ObjectType>> {
-  /// イベントが発生した時刻
-  time: Now,
-  /// イベントが記憶される寿命
-  lifespan: BigUint,
-  /// イベントの中身
-  contents: C,
-  /// イベントを発生させた主体のオブジェクトのID
-  do_object: String,
-  /// オブジェクト間に起こるイベントの場合に、そのイベントの対象となったオブジェクトのID
-  target_object: Option<String>,
-}
-
-impl<C: EventContents<dyn ObjectType> + Clone> Event<C> {
-  pub fn get_time(&self) -> Now {
-    self.time.clone()
-  }
-  pub fn get_lifespan(&self) -> BigUint {
-    self.lifespan.clone()
-  }
-  pub fn get_contents(&self) -> C {
-    self.contents.clone()
-  }
-  pub fn get_do_object_id(&self) -> String {
-    self.do_object.clone()
-  }
-  pub fn get_target_object_id(&self) -> Option<String> {
-    self.target_object.clone()
-  }
-  pub fn is_exists_target_object(&self) -> bool {
-    self.target_object.is_some()
-  }
+pub struct Event<T: EventContents> {
+  pub generated_time: Time,
+  pub lifetime: Option<Time>,
+  pub contents: T,
 }
 
 #[derive(Debug, Clone)]
-pub struct Context<C: EventContents<dyn ObjectType>, O: ToString + ObjectType> {
+pub struct Context<T: EventContents, U: ObjectType> {
   /// 現在の時刻
-  pub time: Now,
-  /// 記憶されているイベント
-  pub memory: Vec<Event<C>>,
-  /// 現在存在する全てのオブジェクト
-  pub objects: FxHashMap<String, Object<O>>,
+  pub time: Time,
+  pub memory: Vec<Event<T>>,
+  pub objects: FxHashMap<String, Object<U>>,
 }
 
-pub type GenerateEvent<C, O> = fn(&Context<C, O>) -> dyn EventContents<dyn ObjectType>;
+#[derive(Debug, Clone)]
+pub struct GeneratedData<T: EventContents, U: ObjectType> {
+  pub events: Vec<T>,
+  pub generate_objects: Vec<U>,
+  pub remove_objects: Vec<String>,
+}
 
-/// 単位時間を一つだけ進め、その結果起こるイベントをすべて記録する
-/// - `C`は「イベントの具体的な中身」
-/// - `O`は「オブジェクトの具体的な中身」
-pub fn run<C: EventContents<dyn ObjectType>, O: ToString + ObjectType, OT>(ctx: &mut Context<C, O>, generate_functions: Vec<Box<GenerateEvent<C, O>>>) -> Vec<Event<C>> {
+pub type Generate<T, U> = fn(&Context<T, U>) -> GeneratedData<T, U>;
+
+pub fn run<T: EventContents, U: ObjectType>(
+  ctx: &mut Context<T, U>,
+  generate_functions: Vec<Generate<T, U>>,
+) {
   ctx.time.plus_one();
   let now = ctx.time.clone();
+  let new_memory = ctx
+    .memory
+    .iter()
+    .filter(|e| {
+      if let Some(lifetime) = &e.lifetime {
+        &e.generated_time.all + &lifetime.all < now.all
+      } else {
+        // Noneの場合は永久に残るものなので残す
+        true
+      }
+    })
+    .cloned()
+    .collect::<Vec<_>>();
+  ctx.memory = new_memory;
+  let mut new_events = Vec::new();
+  let mut new_objects = Vec::new();
+  let mut remove_object_id = Vec::new();
   for f in generate_functions.iter() {
-    let f = **f;
-    let event_contents = f(ctx);
-    let event_name = event_contents.name();
+    let generated_data = f(&ctx);
+    let e_lst = generated_data.events;
+    for e in e_lst.iter() {
+      let event = Event {
+        generated_time: now.clone(),
+        lifetime: e.lifetime(),
+        contents: e.clone(),
+      };
+      new_events.push(event);
+    }
+    let mut r = generated_data.remove_objects;
+    remove_object_id.append(&mut r);
+    let o_lst = generated_data.generate_objects;
+    for o in o_lst.iter() {
+      let object = Object {
+        generated_time: now.clone(),
+        point: o.generated_point(),
+        object_type: o.clone(),
+      };
+      let id = generate_object_id(&o.name(), &o.generated_point(), &now.all);
+      new_objects.push((id, object));
+    }
   }
-  todo!()
+  for object_id in remove_object_id.iter() {
+    ctx.objects.remove(object_id);
+  }
+  ctx.memory.append(&mut new_events);
+  for e in new_events.iter() {
+    if let Some((id, point)) = e.contents.move_object_opt() {
+      if let Some(obj) = ctx.objects.get(&id) {
+        let new_obj = Object {
+          point,
+          ..obj.clone()
+        };
+        ctx.objects.insert(id, new_obj);
+      }
+    }
+  }
+  for object_id in remove_object_id.iter() {
+    ctx.objects.remove(object_id);
+  }
+  for (object_id, object) in new_objects.iter() {
+    ctx.objects.insert(object_id.clone(), object.clone());
+  }
 }
 
 /// オブジェクトのIDを自動で生成する
 /// <object_type><生成された地点><生成された単位時間><実世界の生成されたときの時刻>
 /// で文字列生成してさらにBase64エンコード
-fn generate_object_id<O: core::fmt::Debug>(
-  object_type: &O,
-  point: &Point,
-  generate_time: &BigUint,
-) -> String {
+fn generate_object_id(object_name: &str, point: &Point, generate_time: &BigUint) -> String {
   let now = SystemTime::now();
-  let str = format!("{object_type:?}{point:?}{generate_time:?}{now:?}");
+  let str = format!("{object_name}{point:?}{generate_time:?}{now:?}");
   base64::encode(&str.as_bytes())
 }
