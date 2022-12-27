@@ -133,6 +133,41 @@ impl Time {
       self.clone().one_year_of_day,
     ))
   }
+
+  /// 経過した全ての単位時間
+  pub fn get_all_time(&self) -> BigUint {
+    self.all.clone()
+  }
+
+  /// 経過した年数
+  pub fn get_year(&self) -> BigUint {
+    self.year.clone()
+  }
+
+  /// 経過した日数
+  pub fn get_day(&self) -> BigUint {
+    self.day.clone()
+  }
+
+  /// その日の「何時間目」か
+  pub fn get_remainder_time(&self) -> BigUint {
+    self.remainder_time.clone()
+  }
+
+  /// その年の「何日目」か
+  pub fn get_remainder_day(&self) -> BigUint {
+    self.remainder_day.clone()
+  }
+
+  /// 一日経過するのにかかる単位時間量
+  pub fn get_one_day(&self) -> BigUint {
+    self.one_day_of_time.clone()
+  }
+
+  /// 一年経過するのにかかる単位時間量
+  pub fn get_one_year(&self) -> BigUint {
+    self.one_year_of_day.clone()
+  }
 }
 
 /// 地図上での「地点」を表す。
