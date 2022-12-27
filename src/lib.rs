@@ -1,6 +1,6 @@
 //! これは「世界」をシミュレートするために必要なものを定義したライブラリである。
 //! 「自分が操作しないで自律的に良い感じに複雑なことが起こっている様子を観察したい」という欲求を実現するために作成した。
-//! 
+//!
 //! 導入した概念として
 //! - 時間
 //! - 座標場としての位置
@@ -19,10 +19,8 @@
 //!     - イベント
 //!     - 生成されるオブジェクト
 //!     - 消滅するオブジェクトのID
-//! 
+//!
 //! がある
-
-
 
 use num_bigint::BigUint;
 use num_traits::identities::One;
@@ -150,6 +148,10 @@ pub trait EventContents: Clone {
   /// eventの寿命
   /// Noneの場合は永久
   fn lifetime(&self) -> Option<Time>;
+  /// イベントを発生させた主体のオブジェクトのID
+  fn do_object(&self) -> String;
+  /// オブジェクト間に起こるイベントの場合に、そのイベントの対象となったオブジェクトのID
+  fn target_object_opt(&self) -> Option<String>;
 }
 
 /// 起きるイベント
@@ -161,6 +163,10 @@ pub struct Event<T: EventContents> {
   pub lifetime: Option<Time>,
   /// イベントの中身
   pub contents: T,
+  /// イベントを発生させた主体のオブジェクトのID
+  pub do_object: String,
+  /// オブジェクト間に起こるイベントの場合に、そのイベントの対象となったオブジェクトのID
+  pub target_object: Option<String>,
 }
 
 /// 世界の状態を保持しているもの
@@ -194,7 +200,7 @@ pub type Generater<T, U> = fn(&Context<T, U>) -> GeneratedData<T, U>;
 pub fn run<T: EventContents, U: ObjectType>(
   ctx: &mut Context<T, U>,
   generate_functions: Vec<Generater<T, U>>,
-) {
+) -> Vec<GeneratedData<T, U>> {
   ctx.time.plus_one();
   let now = ctx.time.clone();
   let new_memory = ctx
@@ -214,14 +220,18 @@ pub fn run<T: EventContents, U: ObjectType>(
   let mut new_events = Vec::new();
   let mut new_objects = Vec::new();
   let mut remove_object_id = Vec::new();
+  let mut generated_data_lst = Vec::new();
   for f in generate_functions.iter() {
     let generated_data = f(ctx);
+    generated_data_lst.push(generated_data.clone());
     let e_lst = generated_data.events;
     for e in e_lst.iter() {
       let event = Event {
         generated_time: now.clone(),
         lifetime: e.lifetime(),
         contents: e.clone(),
+        do_object: e.do_object(),
+        target_object: e.target_object_opt(),
       };
       new_events.push(event);
     }
@@ -259,6 +269,7 @@ pub fn run<T: EventContents, U: ObjectType>(
   for (object_id, object) in new_objects.iter() {
     ctx.objects.insert(object_id.clone(), object.clone());
   }
+  generated_data_lst
 }
 
 /// オブジェクトのIDを自動で生成する
