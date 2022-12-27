@@ -29,7 +29,7 @@ use num_traits::identities::One;
 use rustc_hash::FxHashMap;
 use std::time::SystemTime;
 
-/// 現在の時間に関するデータ
+/// 時間に関するデータ
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Time {
   /// 単位時間がどれくらいたったのかを計算する
@@ -49,6 +49,7 @@ pub struct Time {
 }
 
 impl Time {
+  /// 時間の新たな生成
   pub fn new(all: BigUint, one_day_of_time: BigUint, one_year_of_day: BigUint) -> Self {
     let day = &all / &one_day_of_time;
     let remainder_time = &all % &one_day_of_time;
@@ -65,6 +66,7 @@ impl Time {
     }
   }
 
+  /// 時間を任意の量進める
   pub fn plus(&mut self, time: BigUint) {
     let all = &self.all + &time;
     let new_remainder_time = &self.remainder_time + &time;
@@ -84,10 +86,12 @@ impl Time {
     }
   }
 
+  /// 時間を一単位時間進める
   pub fn plus_one(&mut self) {
     self.plus(BigUint::one())
   }
 
+  /// 年や日数にかかる単位時間を変化させられる
   pub fn change_rule(&mut self, one_day_of_time: BigUint, one_year_of_day: BigUint) {
     let plus_day = &self.remainder_time / &one_day_of_time;
     let day = &self.day + &plus_day;
@@ -115,20 +119,26 @@ pub struct Point {
   y: BigUint,
 }
 
+/// オブジェクトの種類やオブジェクトそのものの情報
 pub trait ObjectType: Clone {
+  /// オブジェクトの種類の名前
   fn name(&self) -> String;
+  /// そのオブジェクトが生み出された場所
   fn generated_point(&self) -> Point;
 }
 
+/// 世界に存在する「モノ」
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Object<T: ObjectType + ?Sized> {
   /// 生成時刻
   pub generated_time: Time,
   /// 現在地
   pub point: Point,
+  /// オブジェクトの種類
   pub object_type: T,
 }
 
+/// イベントを生成するために必要な情報
 pub trait EventContents: Clone {
   // /// イベントの発生により生成されるオブジェクトがある場合はそのオブジェクトを返す
   fn generate_object_opt(&self) -> Option<String>;
@@ -142,33 +152,48 @@ pub trait EventContents: Clone {
   fn lifetime(&self) -> Option<Time>;
 }
 
+/// 起きるイベント
 #[derive(Debug, Clone)]
 pub struct Event<T: EventContents> {
+  /// イベントが起きた時刻
   pub generated_time: Time,
+  /// イベントの寿命
   pub lifetime: Option<Time>,
+  /// イベントの中身
   pub contents: T,
 }
 
+/// 世界の状態を保持しているもの
 #[derive(Debug, Clone)]
 pub struct Context<T: EventContents, U: ObjectType> {
   /// 現在の時刻
   pub time: Time,
+  /// 記憶されているイベント
   pub memory: Vec<Event<T>>,
+  /// 現在存在する全てのオブジェクト
   pub objects: FxHashMap<String, Object<U>>,
 }
 
+/// 世界の状態に応じて変化する情報
 #[derive(Debug, Clone)]
 pub struct GeneratedData<T: EventContents, U: ObjectType> {
+  /// 新たに起きたイベント
   pub events: Vec<T>,
+  /// 新たに生成されたオブジェクト
   pub generate_objects: Vec<U>,
+  /// 新たに消滅したオブジェクト
   pub remove_objects: Vec<String>,
 }
 
-pub type Generate<T, U> = fn(&Context<T, U>) -> GeneratedData<T, U>;
+/// 新たな情報を生成するための関数
+pub type Generater<T, U> = fn(&Context<T, U>) -> GeneratedData<T, U>;
 
+/// 単位時間を一つだけ進め、その結果起こるイベントをすべて記録し、世界を更新する
+/// - `T`は「イベントの具体的な中身」
+/// - `U`は「オブジェクトの具体的な中身」
 pub fn run<T: EventContents, U: ObjectType>(
   ctx: &mut Context<T, U>,
-  generate_functions: Vec<Generate<T, U>>,
+  generate_functions: Vec<Generater<T, U>>,
 ) {
   ctx.time.plus_one();
   let now = ctx.time.clone();
