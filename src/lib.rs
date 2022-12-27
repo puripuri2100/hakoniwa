@@ -64,6 +64,27 @@ impl Time {
     }
   }
 
+  pub fn make(
+    year: BigUint,
+    day: BigUint,
+    time: BigUint,
+    one_day_of_time: BigUint,
+    one_year_of_day: BigUint,
+  ) -> Self {
+    let remainder_day = day;
+    let day = &one_year_of_day * &year + &remainder_day;
+    let all = &one_day_of_time * &day + &time;
+    Time {
+      all,
+      one_day_of_time,
+      day,
+      remainder_time: time,
+      one_year_of_day,
+      year,
+      remainder_day,
+    }
+  }
+
   /// 時間を任意の量進める
   pub fn plus(&mut self, time: BigUint) {
     let all = &self.all + &time;
@@ -178,6 +199,20 @@ pub struct Point {
   y: BigUint,
 }
 
+impl Point {
+  pub fn new(x: BigUint, y: BigUint) -> Self {
+    Point { x, y }
+  }
+  /// X座標を入手する
+  pub fn get_x(&self) -> BigUint {
+    self.x.clone()
+  }
+  /// Y座標を入手する
+  pub fn get_y(&self) -> BigUint {
+    self.y.clone()
+  }
+}
+
 /// オブジェクトの種類やオブジェクトそのものの情報
 pub trait ObjectType: Clone {
   /// オブジェクトの種類の名前
@@ -199,10 +234,6 @@ pub struct Object<T: ObjectType + ?Sized> {
 
 /// イベントを生成するために必要な情報
 pub trait EventContents: Clone {
-  // /// イベントの発生により生成されるオブジェクトがある場合はそのオブジェクトを返す
-  fn generate_object_opt(&self) -> Option<String>;
-  /// イベントの発生により削除されるオブジェクトがある場合はそのID
-  fn remove_object_opt(&self) -> Option<String>;
   /// オブジェクトを移動させる場合に発生する
   /// 対象のオブジェクトのIDと移動先の地点
   fn move_object_opt(&self) -> Option<(String, Point)>;
@@ -239,6 +270,20 @@ pub struct Context<T: EventContents, U: ObjectType> {
   pub memory: Vec<Event<T>>,
   /// 現在存在する全てのオブジェクト
   pub objects: FxHashMap<String, Object<U>>,
+}
+
+impl<T: EventContents, U: ObjectType> Context<T, U> {
+  pub fn new(start: Time, o: Vec<(String, Object<U>)>) -> Self {
+    let mut objects: FxHashMap<String, Object<U>> = FxHashMap::default();
+    for (id, obj) in o {
+      objects.insert(id, obj);
+    }
+    Context {
+      time: start,
+      memory: Vec::new(),
+      objects,
+    }
+  }
 }
 
 /// 世界の状態に応じて変化する情報
