@@ -15,3 +15,9 @@ base64 = "0.20.0"
 num-bigint = "0.4.3"
 num-traits = "0.2.15"
 rustc-hash = "1.1.0"
+
+
+[dev-dependencies]
+num-bigint = "0.4.3"
+rand = "0.8.5"
+
